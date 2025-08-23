@@ -8,6 +8,11 @@ n8n-data/
 postgres-data/
 redis-data/
 
+# Workflows directory (giữ lại để backup)
+!workflows/
+!workflows/*.json
+!workflows/*.md
+
 # Logs
 *.log
 logs/

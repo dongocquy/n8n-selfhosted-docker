@@ -1,0 +1,560 @@
+{
+  "name": "Hello_world",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -128,
+        0
+      ],
+      "id": "4adba50a-5ec0-4f9a-843e-59813e8af30b",
+      "name": "Telegram Trigger",
+      "webhookId": "ba413c53-58e6-4ea1-8ae9-a5e99e4ee7b3",
+      "credentials": {
+        "telegramApi": {
+          "id": "7REFeg0mvHXEZezY",
+          "name": "@bingoexv_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"text\":\"{{ $('Telegram Trigger').item.json.message.text }}\",\n\"source\":\"Telegram\",\n\"sessionId\":\"{{$('Telegram Trigger').item.json.message.chat.id}}\"}",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        0
+      ],
+      "id": "5e35ae93-f902-4f6f-962b-096bbddd2686",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseMode": "responseNodes"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -128,
+        160
+      ],
+      "id": "912346db-e982-4c46-b224-a9e5d55e8067",
+      "name": "When chat message received",
+      "webhookId": "3d0eeb1d-09c7-4944-b565-627e736bab0d"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('No Operation, do nothing').item.json.text\t}}",
+        "options": {
+          "systemMessage": "Bạn là trợ lý AI thông minh. Khi người dùng hỏi, hãy ưu tiên sử dụng các tool theo thứ tự sau đây:\n1. Khi người dùng hỏi hãy ưu tiên tìm câu trả lời từ tool: Database-Tools.\n2. Nếu không có câu trả lời từ tool Bingo-Tools hãy xử dụng câu trả lời từ: Google-Search-AI\n*** Lưu ý quan trọng: Chỉ trả lời bằng tiếng Việt.\n*** Nếu ai hỏi thời gian thì hôm nay là {{ $now.toFormat('dd/MM/yyyy') }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        704,
+        64
+      ],
+      "id": "49136be7-0031-49bd-a6e9-3d73c8ed0a18",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        608,
+        304
+      ],
+      "id": "5bce4729-e036-4a31-8633-d390b1b56f35",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "sVsneZJOAchCfHNo",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        448,
+        64
+      ],
+      "id": "47affda6-d198-41dd-b213-1fac3a3432ba",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"text\":\"{{ $('When chat message received').item.json.chatInput }}\",\n\"source\":\"chatInput\",\n\"sessionId\":\"{{ $json.sessionId }}\"\n} \n",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        192,
+        160
+      ],
+      "id": "81118255-927e-4d52-8bd4-95e1935869d6",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('No Operation, do nothing').item.json.source }}",
+                    "rightValue": "Telegram",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "5622f741-db14-425f-96f6-65e1401ee1b3"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3bf1374-25b0-43bd-b5a2-13b0c4bcf0af",
+                    "leftValue": "={{ $('No Operation, do nothing').item.json.source }}",
+                    "rightValue": "chatInput",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1184,
+        64
+      ],
+      "id": "3cf2bd31-adfa-4ba1-9e7f-d951c3276279",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.from.id }}",
+        "text": "={{ $('AI Agent').item.json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1472,
+        -48
+      ],
+      "id": "b17b25d3-74e2-4151-acf9-11553f7b7e54",
+      "name": "Send a text message",
+      "webhookId": "528ccfcf-a781-4d4a-888b-74b853e7a40a",
+      "credentials": {
+        "telegramApi": {
+          "id": "7REFeg0mvHXEZezY",
+          "name": "@bingoexv_ai_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "message": "={{ $('AI Agent').item.json.output }}",
+        "waitUserReply": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chat",
+      "typeVersion": 1,
+      "position": [
+        1472,
+        144
+      ],
+      "id": "88b62026-b1a5-4f55-9870-fbe0aafda937",
+      "name": "Respond to Chat"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={\n  \"x-goog-api-key\": \"\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"{{ $('When Executed by Another Workflow').item.json.content }}\"\n        }\n      ]\n    }\n  ],\n  \"tools\": [\n    {\n      \"google_search\": {}\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        1152,
+        304
+      ],
+      "id": "c1f7bd33-e249-4bb6-bacc-dbcc1b90c42e",
+      "name": "Google-Search-AI1"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('No Operation, do nothing').item.json.sessionId }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        768,
+        320
+      ],
+      "id": "120593d8-420e-495c-b8dd-4fec34732470",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "vuE6eNHMnSKHO0nG",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Ghi nhớ các thông tin mà người dùng yêu cầu để AI trả lời",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        304
+      ],
+      "id": "17bdedf5-95ea-4627-89cb-41bead9996da",
+      "name": "Postgres PGVector Store",
+      "credentials": {
+        "postgres": {
+          "id": "vuE6eNHMnSKHO0nG",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        464
+      ],
+      "id": "ea70fca5-ef7e-41ef-993d-38c0c97f31da",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "sVsneZJOAchCfHNo",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [
+        1488,
+        336
+      ],
+      "id": "8d751b1e-e273-4498-bdb1-a0a06715efe7",
+      "name": "Postgres PGVector Store1",
+      "credentials": {
+        "postgres": {
+          "id": "vuE6eNHMnSKHO0nG",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1424,
+        672
+      ],
+      "id": "349ce27f-b8db-4574-b25d-b11310ded7a8",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "sVsneZJOAchCfHNo",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={\"Human\":\"{{ $('No Operation, do nothing').item.json.text }}\", \"AI\":\"{{ $('AI Agent').item.json.output }}\"\u001c}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1584,
+        656
+      ],
+      "id": "b208d11e-0057-43a5-8c58-7e807de98f6b",
+      "name": "Default Data Loader"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "No Operation, do nothing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Operation, do nothing": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Postgres PGVector Store1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Respond to Chat": {
+      "main": [
+        []
+      ]
+    },
+    "Google-Search-AI1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres PGVector Store": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Postgres PGVector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres PGVector Store1": {
+      "main": [
+        []
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Postgres PGVector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Postgres PGVector Store1",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "69c8bf69-ac1c-40eb-9d98-ad014e1fcfda",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a520e2cc3666662b4241f43c3b72a3a7c2e71c0463a16396d2cf62f90fba625f"
+  },
+  "id": "UClUIPrxm8SCTZvd",
+  "tags": []
+}

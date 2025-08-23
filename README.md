@@ -65,6 +65,16 @@ docker-compose logs -f
 # https://your-subdomain.your-domain.com
 ```
 
+### **📁 Import Workflows (Tùy chọn)**
+```bash
+# Đặt file .json workflow vào thư mục workflows/
+# N8N sẽ tự động import khi khởi động
+workflows/Hellow_world.json
+```
+### **📁 Lấy Gemini API key để sử dụng chức năng tìm kiếm thời gian thực **
+```bash
+# https://aistudio.google.com/apikey
+````
 ## 📋 Yêu cầu hệ thống
 
 - Docker và Docker Compose

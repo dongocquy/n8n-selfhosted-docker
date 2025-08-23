@@ -21,16 +21,12 @@
 #    chmod -R 755 n8n-data
 #
 # ⚠️ KHÔNG BAO GIỜ mount thư mục root (/) vào container vì lý do bảo mật!
-
 services:
   n8n:
-    image: n8nio/n8n:1.107.4   # pin version ổn định thay vì :latest
+    image: n8nio/n8n:1.107.4
     container_name: n8n
     restart: unless-stopped
-    # ports:
-      # - "5678:5678"   # Không cần expose port vì đã dùng Cloudflare tunnel
-    
-    # Resource limits cho production
+    user: "1000:1000"  # Đảm bảo container chạy với user node
     deploy:
       resources:
         limits:
@@ -39,27 +35,24 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-    
     environment:
       - N8N_HOST=${N8N_HOST}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
-      - N8N_EDITOR_BASE_URL=${N8N_HOST}
+      - N8N_EDITOR_BASE_URL=${N8N_HOST}     # giữ host anh đang dùng, chỉ thêm scheme
       - WEBHOOK_URL=${N8N_HOST}
       - N8N_WEBHOOK_URL=${N8N_HOST}
       - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
       - N8N_LOG_LEVEL=info
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_METRICS_ENABLED=false
-
-      # Bật xác thực
       - N8N_USER_MANAGEMENT_DISABLED=false
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin
       - N8N_BASIC_AUTH_PASSWORD=AdminSecurePass2024
       - N8N_ENCRYPTION_KEY=581640c3852826913a434892d82834fd9fa80f940ac07691bd5908624902708c
 
-      # PostgreSQL Database Configuration
+      # Database (giữ nguyên hardcode)
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -67,83 +60,91 @@ services:
       - DB_POSTGRESDB_USER=n8n
       - DB_POSTGRESDB_PASSWORD=PostgresSecurePass2024
 
-      # Redis Configuration (Queue System cho production)
+      # Redis (giữ nguyên hardcode cũ)
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=RedisSecurePass2024
 
-      # Main Process Configuration (Web UI + API)
-      - EXECUTIONS_MODE=main
-      - N8N_RUNNERS_ENABLED=true
-      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
+      # Queue mode (BỔ SUNG đúng biến Bull)
+      - EXECUTIONS_MODE=queue
+      - N8N_RUNNERS_ENABLED=false
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false
       - QUEUE_BULL_PREFIX=n8n
-      
-      # Cấu hình execution cho main process
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=RedisSecurePass2024
+      - QUEUE_BULL_REDIS_DB=0  # BỔ SUNG: Chỉ định database Redis
       - EXECUTIONS_TIMEOUT=3600
       - EXECUTIONS_TIMEOUT_MAX=7200
-      - EXECUTIONS_PROCESS=main
 
-      # Cấu hình DNS và network để tránh lỗi DNS
+      # Bật health endpoints cho readiness
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+
       - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
       - N8N_DISABLE_UI=false
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
     volumes:
-      # Named volume cho production (shared giữa main và worker)
-      - n8n_data:/home/node/.n8n
-      
-      # 🔧 DOCKER SOCKET: Chỉ mount khi cần thiết để chạy Docker từ n8n
+      - n8n_data:/home/node/.n8n:rw  # Thêm :rw để đảm bảo quyền ghi
+      - ./workflows:/home/node/.n8n/workflows:ro
+      # 🔧 DOCKER SOCKET: giữ nguyên theo bản của anh
       - /var/run/docker.sock:/var/run/docker.sock
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
     networks:
       - n8n-network
+
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:5678/healthz').then(r=>{if(r.ok)process.exit(0);process.exit(1)}).catch(()=>process.exit(1))"]
+      # dùng Node http client, không cần cài curl
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz/readiness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 30s
       timeout: 5s
-      retries: 5
+      retries: 10
+
     dns:
       - 8.8.8.8
       - 8.8.4.4
       - 1.1.1.1
 
-  # N8N Worker Service - Xử lý workflow execution
   n8n-worker:
     image: n8nio/n8n:1.107.4
-    container_name: n8n-worker
     restart: unless-stopped
-    
-    # Resource limits cho worker
+    user: "1000:1000"  # Đảm bảo container chạy với user node
     deploy:
+      replicas: 2
       resources:
         limits:
-          cpus: '2.0'
-          memory: 2G
-        reservations:
           cpus: '0.5'
           memory: 512M
-    
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    entrypoint: ["node", "/usr/local/bin/n8n"]
+    command: ["worker"]
     environment:
-      - N8N_HOST=${N8N_HOST}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=https
       - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
       - N8N_LOG_LEVEL=info
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_METRICS_ENABLED=false
 
-      # Bật xác thực (worker cần access database)
-      - N8N_USER_MANAGEMENT_DISABLED=false
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=admin
-      - N8N_BASIC_AUTH_PASSWORD=AdminSecurePass2024
+      # Queue worker - CẤU HÌNH QUAN TRỌNG
+      - EXECUTIONS_MODE=queue
+      - N8N_DISABLE_UI=true
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=true
+      - N8N_WORKER_MODE=true
+      - N8N_RUNNERS_ENABLED=true  # BỔ SUNG: Bật task runners
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true  # BỔ SUNG: Offload manual executions
+
+      # ĐỒNG BỘ ENCRYPTION KEY (BỔ SUNG)
       - N8N_ENCRYPTION_KEY=581640c3852826913a434892d82834fd9fa80f940ac07691bd5908624902708c
 
-      # PostgreSQL Database Configuration
+      # Database (giữ nguyên hardcode)
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -151,50 +152,37 @@ services:
       - DB_POSTGRESDB_USER=n8n
       - DB_POSTGRESDB_PASSWORD=PostgresSecurePass2024
 
-      # Redis Configuration (Queue System)
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=RedisSecurePass2024
-
-      # Worker Process Configuration
-      - EXECUTIONS_MODE=worker
-      - N8N_RUNNERS_ENABLED=true
-      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false
+      # Redis (Bull) — CẤU HÌNH QUEUE ĐẦY ĐỦ
       - QUEUE_BULL_PREFIX=n8n
-      
-      # Cấu hình execution cho worker
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=RedisSecurePass2024
+      - QUEUE_BULL_REDIS_DB=0  # BỔ SUNG: Chỉ định database Redis
+
+      # Health endpoints
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+
       - EXECUTIONS_TIMEOUT=3600
       - EXECUTIONS_TIMEOUT_MAX=7200
-      - EXECUTIONS_PROCESS=worker
-
-      # Worker specific settings
-      - N8N_DISABLE_UI=true
-      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=true
 
     volumes:
-      # Named volume cho production (shared với main process)
-      - n8n_data:/home/node/.n8n:ro
-      
-      # 🔧 DOCKER SOCKET: Worker cần để chạy Docker nodes
-      - /var/run/docker.sock:/var/run/docker.sock
+      - n8n_data:/home/node/.n8n:rw  # Thêm :rw để đảm bảo quyền ghi
+
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+
     networks:
       - n8n-network
+
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
       interval: 30s
       timeout: 5s
-      retries: 5
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
-      - 1.1.1.1
+      retries: 10
 
-  # Cloudflare Tunnel Service
   cloudflared:
     build:
       context: .
@@ -213,7 +201,6 @@ services:
     depends_on:
       - n8n
 
-  # Redis Service cho Queue System
   redis:
     image: redis:7-alpine
     container_name: n8n-redis
@@ -231,7 +218,7 @@ services:
     networks:
       - n8n-network
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD", "redis-cli", "-a", "RedisSecurePass2024", "--raw", "incr", "ping"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -253,7 +240,6 @@ services:
       - POSTGRES_USER=n8n
       - POSTGRES_PASSWORD=PostgresSecurePass2024
       - POSTGRES_INITDB_ARGS=--locale=C.UTF-8
-      # Tối ưu PostgreSQL cho production
       - POSTGRES_SHARED_PRELOAD_LIBRARIES=vector
       - POSTGRES_MAX_CONNECTIONS=200
       - POSTGRES_SHARED_BUFFERS=256MB
@@ -264,7 +250,7 @@ services:
       - POSTGRES_DEFAULT_STATISTICS_TARGET=100
       - POSTGRES_RANDOM_PAGE_COST=1.1
       - POSTGRES_EFFECTIVE_IO_CONCURRENCY=200
-      - POSTGRES_WORK_MEM=4MB
+      - POSTGRES_WORK_MEM=8MB
       - POSTGRES_MIN_WAL_SIZE=1GB
       - POSTGRES_MAX_WAL_SIZE=4GB
       - POSTGRES_MAX_WORKER_PROCESSES=8
@@ -281,7 +267,6 @@ services:
       timeout: 5s
       retries: 10
 
-# 📁 VOLUMES: Quản lý dữ liệu persistent
 volumes:
   postgres_data:
     driver: local
@@ -289,11 +274,12 @@ volumes:
     driver: local
   n8n_data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./n8n-data  # Mount vào thư mục local để dễ quản lý quyền
 
-# 🌐 NETWORKS: Kết nối giữa các containers
 networks:
   n8n-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.18.0.0/16
+    # Lưu ý: nếu trước đây anh để internal: true, hãy bỏ để cloudflared/n8n ra Internet.
