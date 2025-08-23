@@ -1,0 +1,18 @@
+FROM alpine:latest
+
+# Cài đặt curl để download cloudflared
+RUN apk add --no-cache curl
+
+# Download và cài đặt cloudflared
+RUN curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && \
+    chmod +x /usr/local/bin/cloudflared
+
+# Tạo entrypoint script đơn giản
+RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo 'set -e' >> /entrypoint.sh && \
+    echo 'echo "🚀 Starting Cloudflare tunnel..."' >> /entrypoint.sh && \
+    echo 'echo "💡 Sử dụng tunnel token để kết nối"' >> /entrypoint.sh && \
+    echo 'exec cloudflared tunnel run --token $CLOUDFLARE_TUNNEL_TOKEN' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]

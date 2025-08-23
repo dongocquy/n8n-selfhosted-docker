@@ -1,0 +1,19 @@
+[Unit]
+Description=N8N Docker Compose Service
+Requires=docker.service
+After=docker.service
+Wants=network.target
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+WorkingDirectory=/root/n8n-selfhost-docker
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+ExecReload=/usr/bin/docker compose restart
+Restart=always
+RestartSec=10
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,56 @@
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Docker volumes và data
+n8n-data/
+postgres-data/
+redis-data/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Node modules (nếu có)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Cloudflare config (nếu có)
+cloudflare-config.yml
+
+# Docker compose override
+docker-compose.override.yml
+
+# SSL certificates
+*.pem
+*.crt
+*.key
