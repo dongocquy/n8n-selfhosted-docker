@@ -1,0 +1,276 @@
+# ⚠️ QUAN TRỌNG: CẤU HÌNH PRODUCTION CHO N8N
+# 
+# File này được tối ưu hóa để chạy ổn định trên production server
+# - Sửa dependency issues (service_started thay vì service_healthy)
+# - Tăng restart policy và healthcheck timeout
+# - Khắc phục deprecation warnings
+#
+services:
+  n8n:
+    image: n8nio/n8n:1.107.4
+    container_name: n8n
+    restart: always
+    user: "1000:1000"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - N8N_EDITOR_BASE_URL=${N8N_HOST}
+      - WEBHOOK_URL=${N8N_HOST}
+      - N8N_WEBHOOK_URL=${N8N_HOST}
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - N8N_LOG_LEVEL=info
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_METRICS_ENABLED=false
+      - N8N_LOG_OUTPUT=console
+      - N8N_LOG_FILE_ENABLED=false
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=AdminSecurePass2024
+      - N8N_ENCRYPTION_KEY=581640c3852826913a434892d82834fd9fa80f940ac07691bd5908624902708c
+
+      # Database
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=PostgresSecurePass2024
+
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=RedisSecurePass2024
+
+      # Queue mode - Sửa deprecation warnings
+      - EXECUTIONS_MODE=queue
+      - N8N_RUNNERS_ENABLED=true
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
+      - QUEUE_BULL_PREFIX=n8n
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=RedisSecurePass2024
+      - QUEUE_BULL_REDIS_DB=0
+      - EXECUTIONS_TIMEOUT=3600
+      - EXECUTIONS_TIMEOUT_MAX=7200
+
+      # Health endpoints
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
+      - N8N_DISABLE_UI=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+
+    volumes:
+      - n8n-data:/home/node/.n8n:rw
+      - ./workflows:/home/node/.n8n/workflows:ro
+
+    depends_on:
+      postgres:
+        condition: service_started  # Sửa: chỉ đợi started, không đợi healthy
+      redis:
+        condition: service_started  # Sửa: chỉ đợi started, không đợi healthy
+
+    networks:
+      - n8n-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz/readiness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 180s
+      timeout: 60s
+      retries: 5
+      start_period: 600s
+
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+
+  n8n-worker:
+    image: n8nio/n8n:1.107.4
+    restart: always
+    user: "1000:1000"
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    entrypoint: ["node", "/usr/local/bin/n8n"]
+    command: ["worker"]
+    environment:
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - N8N_LOG_LEVEL=info
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_METRICS_ENABLED=false
+
+      # Queue worker
+      - EXECUTIONS_MODE=queue
+      - N8N_DISABLE_UI=true
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=true
+      - N8N_WORKER_MODE=true
+      - N8N_RUNNERS_ENABLED=true
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
+
+      # Encryption key
+      - N8N_ENCRYPTION_KEY=581640c3852826913a434892d82834fd9fa80f940ac07691bd5908624902708c
+
+      # Database
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=PostgresSecurePass2024
+
+      # Redis
+      - QUEUE_BULL_PREFIX=n8n
+      - QUEUE_BULL_REDIS_HOST=redis
+      - QUEUE_BULL_REDIS_PORT=6379
+      - QUEUE_BULL_REDIS_PASSWORD=RedisSecurePass2024
+      - QUEUE_BULL_REDIS_DB=0
+
+      # Health endpoints
+      - QUEUE_HEALTH_CHECK_ACTIVE=true
+
+      - EXECUTIONS_TIMEOUT=3600
+      - EXECUTIONS_TIMEOUT_MAX=7200
+
+    volumes:
+      - n8n-data:/home/node/.n8n:rw
+
+    depends_on:
+      postgres:
+        condition: service_started  # Sửa: chỉ đợi started, không đợi healthy
+      redis:
+        condition: service_started  # Sửa: chỉ đợi started, không đợi healthy
+
+    networks:
+      - n8n-network
+
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep 'n8n worker' | grep -v grep || exit 1"]
+      interval: 120s
+      timeout: 30s
+      retries: 3
+      start_period: 300s
+
+  cloudflared:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudflared
+    container_name: n8n-cloudflared
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - n8n-network
+    depends_on:
+      - n8n
+
+  redis:
+    image: redis:7-alpine
+    container_name: n8n-redis
+    restart: always
+    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --stop-writes-on-bgsave-error no --rdbcompression yes --rdbchecksum yes --tcp-keepalive 300 --timeout 0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - REDIS_PASSWORD=RedisSecurePass2024
+    volumes:
+      - redis-data:/data
+    networks:
+      - n8n-network
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "RedisSecurePass2024", "--raw", "incr", "ping"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: n8n-postgres
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      - POSTGRES_DB=n8n
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=PostgresSecurePass2024
+      - POSTGRES_INITDB_ARGS=--locale=C.UTF-8
+      - POSTGRES_SHARED_PRELOAD_LIBRARIES=vector
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
+      - POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9
+      - POSTGRES_WAL_BUFFERS=16MB
+      - POSTGRES_DEFAULT_STATISTICS_TARGET=100
+      - POSTGRES_RANDOM_PAGE_COST=1.1
+      - POSTGRES_EFFECTIVE_IO_CONCURRENCY=200
+      - POSTGRES_WORK_MEM=8MB
+      - POSTGRES_MIN_WAL_SIZE=1GB
+      - POSTGRES_MAX_WAL_SIZE=4GB
+      - POSTGRES_MAX_WORKER_PROCESSES=8
+      - POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER=4
+      - POSTGRES_MAX_PARALLEL_WORKERS=8
+      - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - n8n-network
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  n8n-data:
+  redis-data:
+  postgres-data:
+
+networks:
+  n8n-network:
+    driver: bridge
