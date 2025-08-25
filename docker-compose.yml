@@ -205,7 +205,7 @@ services:
     image: redis:7-alpine
     container_name: n8n-redis
     restart: unless-stopped
-    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --stop-writes-on-bgsave-error no --rdbcompression yes --rdbchecksum yes
     deploy:
       resources:
         limits:
@@ -219,9 +219,9 @@ services:
       - n8n-network
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "RedisSecurePass2024", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   postgres:
     image: pgvector/pgvector:pg15
