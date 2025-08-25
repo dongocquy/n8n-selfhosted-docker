@@ -205,7 +205,7 @@ services:
     image: redis:7-alpine
     container_name: n8n-redis
     restart: unless-stopped
-    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --stop-writes-on-bgsave-error no --rdbcompression yes --rdbchecksum yes
+    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --stop-writes-on-bgsave-error no --rdbcompression yes --rdbchecksum yes --tcp-keepalive 300 --timeout 0
     deploy:
       resources:
         limits:
@@ -217,11 +217,19 @@ services:
       - redis-data:/data  # Named volume: Tránh vấn đề permission
     networks:
       - n8n-network
+    # Cấu hình bảo mật cho production
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "RedisSecurePass2024", "--raw", "incr", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
 
   postgres:
     image: pgvector/pgvector:pg15
@@ -261,11 +269,19 @@ services:
       - postgres-data:/var/lib/postgresql/data  # Named volume để tránh vấn đề permission
     networks:
       - n8n-network
+    # Cấu hình bảo mật cho production
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 # Volumes section
 volumes:
