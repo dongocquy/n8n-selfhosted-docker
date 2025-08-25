@@ -25,7 +25,7 @@ services:
   n8n:
     image: n8nio/n8n:1.107.4
     container_name: n8n
-    restart: unless-stopped
+    restart: always
     user: "1000:1000"  # Đảm bảo container chạy với user node
     deploy:
       resources:
@@ -46,6 +46,8 @@ services:
       - N8N_LOG_LEVEL=info
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_METRICS_ENABLED=false
+      - N8N_LOG_OUTPUT=console
+      - N8N_LOG_FILE_ENABLED=false
       - N8N_USER_MANAGEMENT_DISABLED=false
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin
@@ -67,8 +69,8 @@ services:
 
       # Queue mode (BỔ SUNG đúng biến Bull)
       - EXECUTIONS_MODE=queue
-      - N8N_RUNNERS_ENABLED=false
-      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false
+      - N8N_RUNNERS_ENABLED=true  # Sửa: Bật task runners để tránh deprecation
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true  # Sửa: Bật offload để tránh deprecation
       - QUEUE_BULL_PREFIX=n8n
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
@@ -101,10 +103,10 @@ services:
     healthcheck:
       # dùng Node http client, không cần cài curl
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz/readiness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
-      interval: 120s  # Sửa: tăng interval
-      timeout: 30s    # Sửa: tăng timeout
-      retries: 3      # Sửa: giảm retries
-      start_period: 300s  # Sửa: tăng start_period
+      interval: 180s  # Sửa: tăng interval để giảm tải
+      timeout: 60s    # Sửa: tăng timeout cho production
+      retries: 5      # Sửa: tăng retries cho production
+      start_period: 600s  # Sửa: tăng start_period cho production
 
     dns:
       - 8.8.8.8
