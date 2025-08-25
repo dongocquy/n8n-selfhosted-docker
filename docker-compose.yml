@@ -85,7 +85,7 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
     volumes:
-      - ./n8n-data:/home/node/.n8n:rw  # Bind mount: Dữ liệu N8N lưu trực tiếp trong thư mục dự án
+      - n8n-data:/home/node/.n8n:rw  # Named volume: Tránh vấn đề permission
       - ./workflows:/home/node/.n8n/workflows:ro
       # 🔒 ĐÃ LOẠI BỎ: Docker socket mount vì không cần thiết và gây rủi ro bảo mật
 
@@ -165,7 +165,7 @@ services:
       - EXECUTIONS_TIMEOUT_MAX=7200
 
     volumes:
-      - ./n8n-data:/home/node/.n8n:rw  # Bind mount: Dữ liệu N8N lưu trực tiếp trong thư mục dự án
+      - n8n-data:/home/node/.n8n:rw  # Named volume: Tránh vấn đề permission
 
     depends_on:
       postgres:
@@ -258,7 +258,7 @@ services:
       - POSTGRES_MAX_PARALLEL_WORKERS=8
       - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data  # Bind mount: Dữ liệu PostgreSQL lưu trực tiếp trong thư mục dự án
+      - postgres-data:/var/lib/postgresql/data  # Named volume để tránh vấn đề permission
     networks:
       - n8n-network
     healthcheck:
@@ -269,7 +269,9 @@ services:
 
 # Volumes section
 volumes:
+  n8n-data:  # Named volume cho N8N để tránh vấn đề permission
   redis-data:  # Named volume cho Redis để tránh vấn đề permission
+  postgres-data:  # Named volume cho PostgreSQL để tránh vấn đề permission
 
 networks:
   n8n-network:
