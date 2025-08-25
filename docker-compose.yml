@@ -22,11 +22,34 @@
 #
 # ⚠️ KHÔNG BAO GIỜ mount thư mục root (/) vào container vì lý do bảo mật!
 services:
+  # Init container để setup quyền thư mục
+  n8n-init:
+    image: busybox:latest
+    container_name: n8n-init
+    restart: "no"
+    user: "0:0"  # Chạy với root để có quyền tạo/sửa thư mục
+    volumes:
+      - ./n8n-data:/n8n-data
+      - ./postgres-data:/postgres-data
+      - ./redis-data:/redis-data
+    command: >
+      sh -c "
+        mkdir -p /n8n-data /postgres-data /redis-data &&
+        chown -R 1000:1000 /n8n-data &&
+        chown -R 999:999 /postgres-data /redis-data &&
+        chmod -R 755 /n8n-data &&
+        chmod -R 750 /postgres-data /redis-data &&
+        echo '✅ Quyền thư mục đã được setup thành công'
+      "
+
   n8n:
     image: n8nio/n8n:1.107.4
     container_name: n8n
     restart: unless-stopped
     user: "1000:1000"  # Đảm bảo container chạy với user node
+    depends_on:
+      n8n-init:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -177,7 +200,8 @@ services:
       - n8n-network
 
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      # Worker không có HTTP endpoint, kiểm tra process thay vì HTTP
+      test: ["CMD-SHELL", "ps aux | grep 'n8n worker' | grep -v grep || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 10
