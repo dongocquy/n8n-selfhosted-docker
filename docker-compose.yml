@@ -50,6 +50,10 @@ services:
     depends_on:
       n8n-init:
         condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -111,12 +115,6 @@ services:
       - ./n8n-data:/home/node/.n8n:rw  # Bind mount: Dữ liệu N8N lưu trực tiếp trong thư mục dự án
       - ./workflows:/home/node/.n8n/workflows:ro
       # 🔒 ĐÃ LOẠI BỎ: Docker socket mount vì không cần thiết và gây rủi ro bảo mật
-
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
     networks:
       - n8n-network
