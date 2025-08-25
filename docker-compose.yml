@@ -15,7 +15,7 @@
 #    - Redis chạy với user 999:999 (redis)
 # 
 # 4. LỆNH CẤP QUYỀN HOÀN CHỈNH:
-#    cd /root/n8n-selfhost
+#    cd /root/n8n-selfhosted-docker
 #    sudo chown -R ubuntu:ubuntu .
 #    sudo chown -R 1000:1000 n8n-data
 #    chmod -R 755 n8n-data
@@ -214,7 +214,7 @@ services:
     environment:
       - REDIS_PASSWORD=RedisSecurePass2024
     volumes:
-      - ./redis-data:/data  # Bind mount: Dữ liệu Redis lưu trực tiếp trong thư mục dự án
+      - redis-data:/data  # Named volume: Tránh vấn đề permission
     networks:
       - n8n-network
     healthcheck:
@@ -267,10 +267,9 @@ services:
       timeout: 5s
       retries: 10
 
-# Volumes section đã được loại bỏ vì tất cả đều sử dụng bind mount
-# - n8n-data: ./n8n-data
-# - postgres-data: ./postgres-data  
-# - redis-data: ./redis-data
+# Volumes section
+volumes:
+  redis-data:  # Named volume cho Redis để tránh vấn đề permission
 
 networks:
   n8n-network:
