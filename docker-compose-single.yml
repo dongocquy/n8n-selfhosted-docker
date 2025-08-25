@@ -1,0 +1,197 @@
+# ⚠️ QUAN TRỌNG: CẤU HÌNH SINGLE INSTANCE CHO N8N
+# 
+# File này dựa trên docker-compose.yml nhưng bỏ worker để chạy n8n ở chế độ single instance
+# - Không có queue mode, chạy trực tiếp trên main instance
+# - Đơn giản hóa cấu hình, phù hợp cho development hoặc server nhỏ
+# - Không cần Redis cho queue
+#
+services:
+  n8n:
+    image: n8nio/n8n:1.107.4
+    container_name: n8n
+    restart: always
+    user: "1000:1000"  # Đảm bảo container chạy với user node
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http  # Sửa: chạy trên HTTP trong container
+      - N8N_EDITOR_BASE_URL=${N8N_HOST}     # giữ host anh đang dùng, chỉ thêm scheme
+      - WEBHOOK_URL=${N8N_HOST}
+      - N8N_WEBHOOK_URL=${N8N_HOST}
+      - GENERIC_TIMEZONE=Asia/Ho_Chi_Minh
+      - N8N_LOG_LEVEL=info
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_METRICS_ENABLED=false
+      - N8N_LOG_OUTPUT=console
+      - N8N_LOG_FILE_ENABLED=false
+      - N8N_USER_MANAGEMENT_DISABLED=false
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=AdminSecurePass2024
+      - N8N_ENCRYPTION_KEY=581640c3852826913a434892d82834fd9fa80f940ac07691bd5908624902708c
+
+      # Database (giữ nguyên hardcode)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=n8n
+      - DB_POSTGRESDB_PASSWORD=PostgresSecurePass2024
+
+      # Single instance mode - KHÔNG dùng queue
+      - EXECUTIONS_MODE=regular  # Sửa: chạy trực tiếp, không qua queue
+      - N8N_RUNNERS_ENABLED=true  # Bật task runners để tránh deprecation
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false  # Không có worker để offload
+
+      # Bật health endpoints cho readiness
+      - QUEUE_HEALTH_CHECK_ACTIVE=false  # Tắt vì không dùng queue
+
+      - N8N_DISABLE_PRODUCTION_MAIN_PROCESS=false
+      - N8N_DISABLE_UI=false
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+
+    volumes:
+      - n8n-data:/home/node/.n8n:rw  # Named volume: Tránh vấn đề permission
+      - ./workflows:/home/node/.n8n/workflows:ro
+      # 🔒 ĐÃ LOẠI BỎ: Docker socket mount vì không cần thiết và gây rủi ro bảo mật
+
+    depends_on:
+      postgres:
+        condition: service_started  # Sửa: chỉ đợi postgres started
+      redis:
+        condition: service_started  # Sửa: chỉ đợi redis started
+
+    networks:
+      - n8n-network
+
+    healthcheck:
+      # dùng Node http client, không cần cài curl
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz/readiness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 180s  # Sửa: tăng interval để giảm tải
+      timeout: 60s    # Sửa: tăng timeout cho production
+      retries: 5      # Sửa: tăng retries cho production
+      start_period: 600s  # Sửa: tăng start_period cho production
+
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
+
+  cloudflared:
+    build:
+      context: .
+      dockerfile: Dockerfile.cloudflared
+    container_name: n8n-cloudflared
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - CLOUDFLARE_TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - n8n-network
+    depends_on:
+      - n8n
+
+  redis:
+    image: redis:7-alpine
+    container_name: n8n-redis
+    restart: always
+    command: redis-server --requirepass RedisSecurePass2024 --maxmemory 512mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000 --stop-writes-on-bgsave-error no --rdbcompression yes --rdbchecksum yes --tcp-keepalive 300 --timeout 0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      - REDIS_PASSWORD=RedisSecurePass2024
+    volumes:
+      - redis-data:/data  # Named volume: Tránh vấn đề permission
+    networks:
+      - n8n-network
+    # Cấu hình bảo mật cho production
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "RedisSecurePass2024", "--raw", "incr", "ping"]
+      interval: 60s
+      timeout: 15s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: n8n-postgres
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      - POSTGRES_DB=n8n
+      - POSTGRES_USER=n8n
+      - POSTGRES_PASSWORD=PostgresSecurePass2024
+      - POSTGRES_INITDB_ARGS=--locale=C.UTF-8
+      - POSTGRES_SHARED_PRELOAD_LIBRARIES=vector
+      - POSTGRES_MAX_CONNECTIONS=200
+      - POSTGRES_SHARED_BUFFERS=256MB
+      - POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+      - POSTGRES_MAINTENANCE_WORK_MEM=64MB
+      - POSTGRES_CHECKPOINT_COMPLETION_TARGET=0.9
+      - POSTGRES_WAL_BUFFERS=16MB
+      - POSTGRES_DEFAULT_STATISTICS_TARGET=100
+      - POSTGRES_RANDOM_PAGE_COST=1.1
+      - POSTGRES_EFFECTIVE_IO_CONCURRENCY=200
+      - POSTGRES_WORK_MEM=8MB
+      - POSTGRES_MIN_WAL_SIZE=1GB
+      - POSTGRES_MAX_WAL_SIZE=4GB
+      - POSTGRES_MAX_WORKER_PROCESSES=8
+      - POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER=4
+      - POSTGRES_MAX_PARALLEL_WORKERS=8
+      - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
+    volumes:
+      - postgres-data:/var/lib/postgresql/data  # Named volume để tránh vấn đề permission
+    networks:
+      - n8n-network
+    # Cấu hình bảo mật cho production
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+# Volumes section
+volumes:
+  n8n-data:  # Named volume cho N8N để tránh vấn đề permission
+  redis-data:  # Named volume cho Redis để tránh vấn đề permission
+  postgres-data:  # Named volume cho PostgreSQL để tránh vấn đề permission
+
+networks:
+  n8n-network:
+    driver: bridge
+    # Lưu ý: nếu trước đây anh để internal: true, hãy bỏ để cloudflared/n8n ra Internet.
