@@ -44,7 +44,19 @@ CLOUDFLARE_TUNNEL_TOKEN=your_tunnel_token_here
 N8N_HOST=https://your-subdomain.your-domain.com
 ```
 
-### **Bước 4: Khởi động hệ thống**
+### **Bước 4: Thiết lập thư mục và quyền (QUAN TRỌNG!)**
+```bash
+# Chạy script setup để tạo thư mục và cấp quyền
+chmod +x setup-folders.sh
+./setup-folders.sh
+
+# Script sẽ tự động:
+# - Tạo các thư mục cần thiết
+# - Cấp quyền chính xác cho Docker containers
+# - Kiểm tra môi trường Docker
+```
+
+### **Bước 5: Khởi động hệ thống**
 ```bash
 # Chạy một lệnh duy nhất
 docker-compose up -d
@@ -83,6 +95,17 @@ workflows/Hellow_world.json
 - 20GB disk space
 - CPU: 2 cores trở lên
 
+## 🛠️ **Script Setup Tự Động**
+
+Dự án bao gồm script `setup-folders.sh` để tự động:
+- ✅ Kiểm tra môi trường Docker
+- ✅ Tạo thư mục cần thiết
+- ✅ Cấp quyền chính xác cho containers
+- ✅ Dừng containers đang chạy nếu cần
+- ✅ Kiểm tra cuối cùng trước khi khởi động
+
+**⚠️ QUAN TRỌNG: Luôn chạy script này trước khi `docker-compose up`!**
+
 
 
 ### **🚨 Troubleshooting nhanh**
@@ -91,8 +114,8 @@ workflows/Hellow_world.json
 docker-compose down
 docker-compose up -d
 
-# Nếu có lỗi permission
-sudo chown -R $USER:$USER .
+# Nếu có lỗi permission - CHẠY SCRIPT SETUP TRƯỚC!
+./setup-folders.sh
 
 # Nếu có lỗi port
 sudo lsof -i :5678

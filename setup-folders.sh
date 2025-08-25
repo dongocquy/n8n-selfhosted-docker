@@ -3,6 +3,10 @@
 # Script thiết lập thư mục cho N8N Self-Hosted
 # Tác giả: Assistant
 # Ngày tạo: $(date)
+#
+# 📁 CÁC THƯ MỤC ĐƯỢC TẠO:
+# - n8n-data: Dữ liệu N8N (có thể dùng bind mount)
+# - postgres-data: Database PostgreSQL (có thể dùng bind mount)
 
 set -e  # Dừng script nếu có lỗi
 
@@ -164,10 +168,8 @@ main() {
     
     # Định nghĩa các thư mục cần thiết (tương thích với bash cũ)
     directories=(
-        "n8n-data:1000:1000:755"
-        "postgres-data:999:999:700"
-        "redis-data:999:999:755"
-        "workflows:1000:1000:755"
+        "n8n-data:1000:1000:755"      # Dữ liệu N8N (có thể dùng bind mount)
+        "postgres-data:999:999:700"    # Database PostgreSQL (có thể dùng bind mount)
     )
     
     # Xử lý từng thư mục
@@ -188,6 +190,8 @@ main() {
             # Tạo thư mục mới
             create_directory "$dir" "$owner" "$group" "$permissions"
         fi
+        
+
     done
     
     echo
@@ -214,10 +218,10 @@ main() {
     echo "  docker compose up -d"
     echo
     print_info "Dữ liệu sẽ được lưu trong:"
-    echo "  - ./n8n-data (dữ liệu N8N)"
-    echo "  - ./postgres-data (database PostgreSQL)"
-    echo "  - ./redis-data (cache Redis)"
-    echo "  - ./workflows (workflows N8N)"
+    echo "  - ./n8n-data (dữ liệu N8N - có thể dùng bind mount)"
+    echo "  - ./postgres-data (database PostgreSQL - có thể dùng bind mount)"
+    echo "  - redis-data (cache Redis - LUÔN dùng named volume)"
+    echo "  - ./workflows (workflows N8N - bind mount từ host)"
 }
 
 # Chạy script
