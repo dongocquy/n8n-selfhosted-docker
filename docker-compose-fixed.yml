@@ -38,7 +38,7 @@ services:
     environment:
       - N8N_HOST=${N8N_HOST}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=https
+      - N8N_PROTOCOL=http  # Sửa: chạy trên HTTP trong container
       - N8N_EDITOR_BASE_URL=${N8N_HOST}     # giữ host anh đang dùng, chỉ thêm scheme
       - WEBHOOK_URL=${N8N_HOST}
       - N8N_WEBHOOK_URL=${N8N_HOST}
@@ -91,9 +91,9 @@ services:
 
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy  # Sửa: đợi postgres healthy
       redis:
-        condition: service_started
+        condition: service_healthy  # Sửa: đợi redis healthy
 
     networks:
       - n8n-network
@@ -101,10 +101,10 @@ services:
     healthcheck:
       # dùng Node http client, không cần cài curl
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:5678/healthz/readiness',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
-      interval: 120s
-      timeout: 30s
-      retries: 3
-      start_period: 300s
+      interval: 120s  # Sửa: tăng interval
+      timeout: 30s    # Sửa: tăng timeout
+      retries: 3      # Sửa: giảm retries
+      start_period: 300s  # Sửa: tăng start_period
 
     dns:
       - 8.8.8.8
@@ -170,9 +170,9 @@ services:
 
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy  # Sửa: đợi postgres healthy
       redis:
-        condition: service_started
+        condition: service_healthy  # Sửa: đợi redis healthy
 
     networks:
       - n8n-network
@@ -180,10 +180,10 @@ services:
     healthcheck:
       # Worker không có HTTP endpoint, kiểm tra process thay vì HTTP
       test: ["CMD-SHELL", "ps aux | grep 'n8n worker' | grep -v grep || exit 1"]
-      interval: 120s
-      timeout: 30s
-      retries: 3
-      start_period: 300s
+      interval: 120s  # Sửa: tăng interval
+      timeout: 30s    # Sửa: tăng timeout
+      retries: 3      # Sửa: giảm retries
+      start_period: 300s  # Sửa: tăng start_period
 
   cloudflared:
     build:
