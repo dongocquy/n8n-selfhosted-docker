@@ -1,26 +1,34 @@
-# ⚠️ QUAN TRỌNG: VẤN ĐỀ CẤP QUYỀN THƯ MỤC MOUNT
+# 🐳 N8N SELF-HOSTED DOCKER COMPOSE
 # 
-# Khi sử dụng bind mount volumes, cần cấp quyền chính xác để tránh lỗi "Permission denied":
+# 📁 VOLUME MOUNTING OPTIONS (Tùy chọn mount volumes)
 # 
-# 1. THƯ MỤC CHA: /root/n8n-selfhost phải thuộc về user 1000 (ubuntu)
-#    sudo chown -R ubuntu:ubuntu /root/n8n-selfhost
+# 🔧 MẶC ĐỊNH: Sử dụng NAMED VOLUMES (hoạt động trên mọi hệ điều hành)
+#    - Dữ liệu được lưu trong Docker volumes
+#    - Không cần cấp quyền thư mục
+#    - Hoạt động ổn định trên macOS, Windows, Linux
 # 
-# 2. THƯ MỤC MOUNT: ./n8n-data phải có quyền 755 và owner 1000:1000
+# 📂 TÙY CHỌN: BIND MOUNT (chỉ dành cho Ubuntu/Linux)
+#    - Dữ liệu được lưu trực tiếp trong thư mục host
+#    - Dễ dàng backup và truy cập từ host
+#    - CẦN cấp quyền thư mục chính xác:
+# 
+#    # Cấp quyền cho thư mục mount:
 #    sudo chown -R 1000:1000 n8n-data
+#    sudo chown -R 999:999 postgres-data  
+#    sudo chown -R 999:999 redis-data
 #    chmod -R 755 n8n-data
+#    chmod -R 700 postgres-data
+#    chmod -R 755 redis-data
 # 
-# 3. USER ID TRONG CONTAINER: Phải khớp với owner của thư mục mount
-#    - N8N chạy với user 1000:1000
-#    - PostgreSQL chạy với user 999:999 (postgres)
-#    - Redis chạy với user 999:999 (redis)
+# 🚀 ĐỂ SỬ DỤNG BIND MOUNT:
+#    1. COMMENT dòng NAMED VOLUME (dòng có n8n-data:/home/node/.n8n:rw)
+#    2. UNCOMMENT dòng BIND MOUNT (dòng có ./n8n-data:/home/node/.n8n:rw)
+#    3. Làm tương tự với postgres-data
+#    4. COMMENT tất cả volumes trong phần "Volumes section" ở cuối file
+#    5. Chạy lệnh cấp quyền ở trên
+#    6. Khởi động lại containers
 # 
-# 4. LỆNH CẤP QUYỀN HOÀN CHỈNH:
-#    cd /root/n8n-selfhosted-docker
-#    sudo chown -R ubuntu:ubuntu .
-#    sudo chown -R 1000:1000 n8n-data
-#    chmod -R 755 n8n-data
-#
-# ⚠️ KHÔNG BAO GIỜ mount thư mục root (/) vào container vì lý do bảo mật!
+# ⚠️ LƯU Ý: Bind mount có thể gây lỗi trên macOS/Windows, khuyến nghị dùng named volumes
 services:
   n8n:
     image: n8nio/n8n:1.107.4
@@ -67,8 +75,8 @@ services:
 
       # Queue mode (BỔ SUNG đúng biến Bull)
       - EXECUTIONS_MODE=queue
-      - N8N_RUNNERS_ENABLED=false
-      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false
+      - N8N_RUNNERS_ENABLED=true
+      - OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true
       - QUEUE_BULL_PREFIX=n8n
       - QUEUE_BULL_REDIS_HOST=redis
       - QUEUE_BULL_REDIS_PORT=6379
@@ -85,8 +93,13 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
     volumes:
-      - n8n-data:/home/node/.n8n:rw  # Named volume: Tránh vấn đề permission
-      - ./workflows:/home/node/.n8n/workflows:ro
+      # 🐳 NAMED VOLUME (Mặc định - hoạt động trên mọi hệ điều hành)
+      - n8n-data:/home/node/.n8n:rw
+      
+      # 📁 BIND MOUNT (Tùy chọn - chỉ dành cho Ubuntu/Linux)
+      # ⚠️ QUAN TRỌNG: Khi dùng BIND MOUNT, phải COMMENT dòng NAMED VOLUME ở trên!
+      # - ./n8n-data:/home/node/.n8n:rw
+      
       # 🔒 ĐÃ LOẠI BỎ: Docker socket mount vì không cần thiết và gây rủi ro bảo mật
 
     depends_on:
@@ -166,7 +179,12 @@ services:
       - EXECUTIONS_TIMEOUT_MAX=7200
 
     volumes:
-      - n8n-data:/home/node/.n8n:rw  # Named volume: Tránh vấn đề permission
+      # 🐳 NAMED VOLUME (Mặc định - hoạt động trên mọi hệ điều hành)
+      - n8n-data:/home/node/.n8n:rw
+      
+      # 📁 BIND MOUNT (Tùy chọn - chỉ dành cho Ubuntu/Linux)
+      # ⚠️ QUAN TRỌNG: Khi dùng BIND MOUNT, phải COMMENT dòng NAMED VOLUME ở trên!
+      # - ./n8n-data:/home/node/.n8n:rw
 
     depends_on:
       postgres:
@@ -268,7 +286,12 @@ services:
       - POSTGRES_MAX_PARALLEL_WORKERS=8
       - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
     volumes:
-      - postgres-data:/var/lib/postgresql/data  # Named volume để tránh vấn đề permission
+      # 🐳 NAMED VOLUME (Mặc định - hoạt động trên mọi hệ điều hành)
+      - postgres-data:/var/lib/postgresql/data
+      
+      # 📁 BIND MOUNT (Tùy chọn - chỉ dành cho Ubuntu/Linux)
+      # ⚠️ QUAN TRỌNG: Khi dùng BIND MOUNT, phải COMMENT dòng NAMED VOLUME ở trên!
+      # - ./postgres-data:/var/lib/postgresql/data
     networks:
       - n8n-network
     # Cấu hình bảo mật cho production
@@ -286,12 +309,15 @@ services:
       start_period: 60s
 
 # Volumes section
+# ⚠️ QUAN TRỌNG: Khi sử dụng BIND MOUNT, phải COMMENT các dòng volumes này!
+# 
+# 🔧 MẶC ĐỊNH (Named Volumes): Giữ nguyên các dòng dưới
+# 📁 BIND MOUNT: Comment tất cả các dòng volumes này
 volumes:
-  n8n-data:  # Named volume cho N8N để tránh vấn đề permission
-  redis-data:  # Named volume cho Redis để tránh vấn đề permission
-  postgres-data:  # Named volume cho PostgreSQL để tránh vấn đề permission
+  n8n-data:      # Named volume cho N8N
+  postgres-data: # Named volume cho PostgreSQL  
+  redis-data:    # Named volume cho Redis
 
 networks:
   n8n-network:
     driver: bridge
-    # Lưu ý: nếu trước đây anh để internal: true, hãy bỏ để cloudflared/n8n ra Internet.
