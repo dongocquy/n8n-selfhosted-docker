@@ -85,10 +85,9 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
 
     volumes:
-      - n8n_data:/home/node/.n8n:rw  # Thêm :rw để đảm bảo quyền ghi
+      - ./n8n-data:/home/node/.n8n:rw  # Bind mount: Dữ liệu N8N lưu trực tiếp trong thư mục dự án
       - ./workflows:/home/node/.n8n/workflows:ro
-      # 🔧 DOCKER SOCKET: giữ nguyên theo bản của anh
-      - /var/run/docker.sock:/var/run/docker.sock
+      # 🔒 ĐÃ LOẠI BỎ: Docker socket mount vì không cần thiết và gây rủi ro bảo mật
 
     depends_on:
       postgres:
@@ -166,7 +165,7 @@ services:
       - EXECUTIONS_TIMEOUT_MAX=7200
 
     volumes:
-      - n8n_data:/home/node/.n8n:rw  # Thêm :rw để đảm bảo quyền ghi
+      - ./n8n-data:/home/node/.n8n:rw  # Bind mount: Dữ liệu N8N lưu trực tiếp trong thư mục dự án
 
     depends_on:
       postgres:
@@ -214,7 +213,7 @@ services:
     environment:
       - REDIS_PASSWORD=RedisSecurePass2024
     volumes:
-      - redis_data:/data
+      - ./redis-data:/data  # Bind mount: Dữ liệu Redis lưu trực tiếp trong thư mục dự án
     networks:
       - n8n-network
     healthcheck:
@@ -258,7 +257,7 @@ services:
       - POSTGRES_MAX_PARALLEL_WORKERS=8
       - POSTGRES_MAX_PARALLEL_MAINTENANCE_WORKERS=4
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-data:/var/lib/postgresql/data  # Bind mount: Dữ liệu PostgreSQL lưu trực tiếp trong thư mục dự án
     networks:
       - n8n-network
     healthcheck:
@@ -268,16 +267,10 @@ services:
       retries: 10
 
 volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  n8n_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ./n8n-data  # Mount vào thư mục local để dễ quản lý quyền
+  # Tất cả volumes đã chuyển sang bind mount để dễ quản lý
+  # postgres_data: ./postgres-data
+  # redis_data: ./redis-data  
+  # n8n_data: ./n8n-data
 
 networks:
   n8n-network:
