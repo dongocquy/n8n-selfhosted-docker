@@ -266,11 +266,10 @@ services:
       timeout: 5s
       retries: 10
 
-volumes:
-  # Tất cả volumes đã chuyển sang bind mount để dễ quản lý
-  # postgres_data: ./postgres-data
-  # redis_data: ./redis-data  
-  # n8n_data: ./n8n-data
+# Volumes section đã được loại bỏ vì tất cả đều sử dụng bind mount
+# - n8n-data: ./n8n-data
+# - postgres-data: ./postgres-data  
+# - redis-data: ./redis-data
 
 networks:
   n8n-network:
